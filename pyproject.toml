@@ -1,0 +1,14 @@
+[project]
+name = "fastapi-generator"
+version = "0.1.0"
+description = "Генератор FastAPI сервисов с поддержкой PostgreSQL, Redis и RabbitMQ"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "jinja2>=3.1.2",
+    "typer>=0.9.0",
+    "rich>=13.7.0",
+]
+
+[tool.uv]
+dev-dependencies = []

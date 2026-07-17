@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  {{ service_name }}:
+    build: .
+    ports:
+      - "{{ port }}:{{ port }}"
+    environment:
+      LOG_LEVEL: INFO
+      {% if features.redis %}
+      REDIS_URL: redis://redis:6379/0
+      {% endif %}
+      {% if features.rabbitmq %}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/{{ rabbitmq_vhost }}
+      {% endif %}
+      {% if features.langfuse %}
+      LANGFUSE_ENABLED: "true"
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
+      LANGFUSE_HOST: ${LANGFUSE_HOST}
+      {% endif %}
+    depends_on:
+      {% if features.redis %}
+      redis:
+        condition: service_healthy
+      {% endif %}
+      {% if features.rabbitmq %}
+      rabbitmq:
+        condition: service_healthy
+      {% endif %}
+    networks:
+      - {{ service_name }}-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:{{ port }}/health/').raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  {% if features.redis %}
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - {{ service_name }}-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  {% endif %}
+
+  {% if features.rabbitmq %}
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_VHOST: {{ rabbitmq_vhost }}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - {{ service_name }}-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+  {% endif %}
+
+networks:
+  {{ service_name }}-network:
+    driver: bridge
+
+volumes:
+  {% if features.redis %}
+  redis_data:
+  {% endif %}
+  {% if features.rabbitmq %}
+  rabbitmq_data:
+  {% endif %}

@@ -1,0 +1,58 @@
+"""
+Application configuration using pydantic-settings
+Follows 12-factor app methodology
+"""
+from typing import Optional
+from pydantic_settings import BaseSettings
+from functools import lru_cache
+
+
+class Settings(BaseSettings):
+    """Application settings"""
+    
+    # Application
+    app_name: str = "{{ service_name }}"
+    app_version: str = "0.1.0"
+    app_description: str = "FastAPI Microservice with LangChain"
+    debug: bool = False
+    
+    # Server
+    host: str = "0.0.0.0"
+    port: int = {{ port }}
+    cors_origins: str = "*"
+    
+    # Logging
+    log_level: str = "INFO"
+    
+    {% if features.redis %}
+    # Redis
+    redis_enabled: bool = True
+    redis_url: str = "redis://localhost:6379/0"
+    redis_password: Optional[str] = None
+    redis_db: int = 0
+    {% endif %}
+    
+    {% if features.rabbitmq %}
+    # RabbitMQ
+    rabbitmq_enabled: bool = True
+    rabbitmq_url: str = "amqp://guest:guest@localhost:5672/{{ rabbitmq_vhost }}"
+    rabbitmq_queue_prefix: str = "{{ service_name }}"
+    {% endif %}
+    
+    {% if features.langfuse %}
+    # LangFuse
+    langfuse_enabled: bool = True
+    langfuse_public_key: str = "{{ langfuse_public_key }}"
+    langfuse_secret_key: str = "{{ langfuse_secret_key }}"
+    langfuse_host: str = "{{ langfuse_host }}"
+    {% endif %}
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
+
+
+@lru_cache()
+def get_settings() -> Settings:
+    """Get cached settings"""
+    return Settings()

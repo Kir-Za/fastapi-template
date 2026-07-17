@@ -1,0 +1,36 @@
+# {{ service_name }}
+
+FastAPI microservice
+
+## Opportunities
+
+- ✅ FastAPI
+- ✅ Docker
+- ✅ Health Check API
+{% if features.postgresql %}
+- ✅ PostgreSQL с SQLAlchemy async
+{% endif %}
+{% if features.redis %}
+- ✅ Redis
+{% endif %}
+{% if features.rabbitmq %}
+- ✅ RabbitMQ
+{% endif %}
+
+## Quick start
+
+### Local development
+
+```bash
+# Creating a virtual environment
+make create-venv
+source .venv/bin/activate
+
+# Installing dependencies
+make install
+
+# Creation.env file
+cp .env.example .env
+
+# Launching the service
+make run

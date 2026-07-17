@@ -1,0 +1,34 @@
+"""
+RabbitMQ connection using aio-pika
+"""
+import aio_pika
+from src.config import get_settings
+
+settings = get_settings()
+
+_rabbitmq_connection: aio_pika.RobustConnection = None
+
+
+async def create_connection() -> aio_pika.RobustConnection:
+    """Create and return RabbitMQ connection"""
+    global _rabbitmq_connection
+    
+    connection = await aio_pika.connect_robust(settings.rabbitmq_url)
+    _rabbitmq_connection = connection
+    return connection
+
+
+async def get_rabbitmq_connection() -> aio_pika.RobustConnection:
+    """Get existing RabbitMQ connection or create new one"""
+    global _rabbitmq_connection
+    if _rabbitmq_connection is None or _rabbitmq_connection.is_closed:
+        _rabbitmq_connection = await create_connection()
+    return _rabbitmq_connection
+
+
+async def close_rabbitmq_connection():
+    """Close RabbitMQ connection"""
+    global _rabbitmq_connection
+    if _rabbitmq_connection and not _rabbitmq_connection.is_closed:
+        await _rabbitmq_connection.close()
+        _rabbitmq_connection = None

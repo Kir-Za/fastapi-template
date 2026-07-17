@@ -1,0 +1,43 @@
+"""
+Redis connection using redis-py async
+"""
+import redis.asyncio as aioredis
+from src.config import get_settings
+
+settings = get_settings()
+
+_redis_client: aioredis.Redis = None
+
+
+async def create_redis_client() -> aioredis.Redis:
+    """Create and return Redis client"""
+    global _redis_client
+    
+    client = aioredis.from_url(
+        settings.redis_url,
+        password=settings.redis_password,
+        db=settings.redis_db,
+        decode_responses=True
+    )
+    
+    # Test connection
+    await client.ping()
+    
+    _redis_client = client
+    return client
+
+
+async def get_redis_client() -> aioredis.Redis:
+    """Get existing Redis client or create new one"""
+    global _redis_client
+    if _redis_client is None:
+        _redis_client = await create_redis_client()
+    return _redis_client
+
+
+async def close_redis_client():
+    """Close Redis client connection"""
+    global _redis_client
+    if _redis_client:
+        await _redis_client.close()
+        _redis_client = None

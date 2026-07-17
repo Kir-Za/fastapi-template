@@ -1,0 +1,196 @@
+"""
+Health Check system for service and dependencies monitoring
+"""
+import asyncio
+import logging
+from typing import Dict, Optional
+from datetime import datetime, timezone
+from enum import Enum
+
+from src.config import get_settings
+
+logger = logging.getLogger(__name__)
+settings = get_settings()
+
+
+class HealthStatus(str, Enum):
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"
+    DEGRADED = "degraded"
+
+
+class ComponentHealth:
+    """Individual component health status"""
+    
+    def __init__(self, name: str):
+        self.name = name
+        self.status = HealthStatus.UNHEALTHY
+        self.last_check: Optional[datetime] = None
+        self.error: Optional[str] = None
+        self.details: Dict = {}
+    
+    def to_dict(self) -> Dict:
+        return {
+            "name": self.name,
+            "status": self.status.value,
+            "last_check": self.last_check.isoformat() if self.last_check else None,
+            "error": self.error,
+            "details": self.details
+        }
+
+
+class HealthChecker:
+    """Service health checker for all components"""
+    
+    def __init__(self):
+        self.components: Dict[str, ComponentHealth] = {}
+        {% if features.redis %}
+        self.redis_client = None
+        {% endif %}
+        {% if features.rabbitmq %}
+        self.rabbitmq_connection = None
+        {% endif %}
+    
+    async def initialize(self):
+        """Initialize and check all components"""
+        logger.info("Initializing health checker...")
+        
+        {% if features.redis %}
+        if settings.redis_enabled:
+            await self._init_redis()
+        {% endif %}
+        
+        {% if features.rabbitmq %}
+        if settings.rabbitmq_enabled:
+            await self._init_rabbitmq()
+        {% endif %}
+        
+        await self.check_all()
+    
+    {% if features.redis %}
+    async def _init_redis(self):
+        """Initialize Redis connection"""
+        from src.connections.redis import create_redis_client
+        
+        try:
+            self.redis_client = await create_redis_client()
+            self.components["redis"] = ComponentHealth("Redis")
+            logger.info("Redis client created")
+        except Exception as e:
+            logger.error(f"Failed to initialize Redis: {e}")
+            component = ComponentHealth("Redis")
+            component.error = str(e)
+            self.components["redis"] = component
+    
+    async def check_redis(self):
+        """Check Redis health"""
+        component = self.components.get("redis")
+        if not component or not self.redis_client:
+            return
+        
+        try:
+            result = await self.redis_client.ping()
+            component.status = HealthStatus.HEALTHY if result else HealthStatus.UNHEALTHY
+            info = await self.redis_client.info("server")
+            component.details["version"] = info.get("redis_version", "unknown")
+        except Exception as e:
+            component.status = HealthStatus.UNHEALTHY
+            component.error = str(e)
+            logger.warning(f"Redis health check failed: {e}")
+        finally:
+            component.last_check = datetime.now(timezone.utc)
+    {% endif %}
+    
+    {% if features.rabbitmq %}
+    async def _init_rabbitmq(self):
+        """Initialize RabbitMQ connection"""
+        from src.connections.rabbitmq import create_connection
+        
+        try:
+            self.rabbitmq_connection = await create_connection()
+            self.components["rabbitmq"] = ComponentHealth("RabbitMQ")
+            logger.info("RabbitMQ connection created")
+        except Exception as e:
+            logger.error(f"Failed to initialize RabbitMQ: {e}")
+            component = ComponentHealth("RabbitMQ")
+            component.error = str(e)
+            self.components["rabbitmq"] = component
+    
+    async def check_rabbitmq(self):
+        """Check RabbitMQ health"""
+        component = self.components.get("rabbitmq")
+        if not component or not self.rabbitmq_connection:
+            return
+        
+        try:
+            if not self.rabbitmq_connection.is_closed:
+                component.status = HealthStatus.HEALTHY
+                component.details["url"] = settings.rabbitmq_url
+            else:
+                component.status = HealthStatus.UNHEALTHY
+        except Exception as e:
+            component.status = HealthStatus.UNHEALTHY
+            component.error = str(e)
+            logger.warning(f"RabbitMQ health check failed: {e}")
+        finally:
+            component.last_check = datetime.now(timezone.utc)
+    {% endif %}
+    
+    async def check_all(self) -> Dict:
+        """Check all components health"""
+        tasks = []
+        
+        {% if features.redis %}
+        if "redis" in self.components:
+            tasks.append(self.check_redis())
+        {% endif %}
+        
+        {% if features.rabbitmq %}
+        if "rabbitmq" in self.components:
+            tasks.append(self.check_rabbitmq())
+        {% endif %}
+        
+        if tasks:
+            await asyncio.gather(*tasks)
+        
+        return self.get_health_report()
+    
+    def get_health_report(self) -> Dict:
+        """Get complete health report"""
+        components_status = {
+            name: component.to_dict()
+            for name, component in self.components.items()
+        }
+        
+        statuses = [comp.status for comp in self.components.values()]
+        
+        if not statuses:
+            overall_status = HealthStatus.HEALTHY
+        elif all(s == HealthStatus.HEALTHY for s in statuses):
+            overall_status = HealthStatus.HEALTHY
+        elif any(s == HealthStatus.UNHEALTHY for s in statuses):
+            overall_status = HealthStatus.UNHEALTHY
+        else:
+            overall_status = HealthStatus.DEGRADED
+        
+        return {
+            "status": overall_status.value,
+            "service": settings.app_name,
+            "version": settings.app_version,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "components": components_status
+        }
+    
+    async def cleanup(self):
+        """Cleanup resources"""
+        {% if features.redis %}
+        if self.redis_client:
+            await self.redis_client.close()
+            logger.info("Redis client closed")
+        {% endif %}
+        
+        {% if features.rabbitmq %}
+        if self.rabbitmq_connection:
+            await self.rabbitmq_connection.close()
+            logger.info("RabbitMQ connection closed")
+        {% endif %}
