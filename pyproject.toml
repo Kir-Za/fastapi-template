@@ -1,7 +1,7 @@
 [project]
 name = "fastapi-generator"
 version = "0.1.0"
-description = "Генератор FastAPI сервисов с поддержкой PostgreSQL, Redis и RabbitMQ"
+description = "FastAPI service generator with support for PostgreSQL, Redis, and RabbitMQ"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

@@ -185,7 +185,7 @@ class FastAPIGenerator:
     
     def generate_requirements(self, config: Dict[str, Any], output_path: Path):
         requirements = [
-            "fastapi>=0.109.0",
+            "fastapi[standard]>=0.109.0",
             "uvicorn[standard]>=0.27.0",
             "pydantic>=2.6.0",
             "pydantic-settings>=2.1.0",
@@ -248,10 +248,10 @@ docker-build: ## Build a Docker image
 	docker build -t $(SERVICE_NAME) .
 
 docker-up: ## Run with Docker Compose
-	docker-compose up -d
+	docker compose up -d
 
 docker-down: ## Stop Docker Compose
-	docker-compose down
+	docker compose down
 
 test: ## Run the tests
 	python -m pytest tests/
