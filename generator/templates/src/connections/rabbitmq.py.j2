@@ -1,12 +1,11 @@
-"""
-RabbitMQ connection using aio-pika
-"""
+from typing import Optional
+
 import aio_pika
 from src.config import get_settings
 
 settings = get_settings()
 
-_rabbitmq_connection: aio_pika.RobustConnection = None
+_rabbitmq_connection: Optional[aio_pika.RobustConnection] = None
 
 
 async def create_connection() -> aio_pika.RobustConnection:
@@ -31,4 +30,4 @@ async def close_rabbitmq_connection():
     global _rabbitmq_connection
     if _rabbitmq_connection and not _rabbitmq_connection.is_closed:
         await _rabbitmq_connection.close()
-        _rabbitmq_connection = None
+        _rabbitmq_connection = None # type: ignore

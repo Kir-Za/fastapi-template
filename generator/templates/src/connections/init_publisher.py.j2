@@ -1,0 +1,35 @@
+import logging
+from typing import Optional
+from src.connections.publisher import RabbitMQPublisher
+
+logger = logging.getLogger(__name__)
+
+_publisher: Optional[RabbitMQPublisher] = None
+
+
+async def init_publisher(settings) -> RabbitMQPublisher:
+    global _publisher
+
+    publisher = RabbitMQPublisher(settings)
+    await publisher.start()
+    _publisher = publisher
+
+    logger.info("Publisher initialized")
+    return publisher
+
+
+async def get_publisher() -> RabbitMQPublisher:
+    assert _publisher is not None, "Publisher not initialized. Call init_publisher first."
+    return _publisher
+
+
+async def publish(message, routing_key=None, headers=None) -> None:
+    pub = await get_publisher()
+    await pub.publish(message, routing_key, headers)
+
+
+async def stop_publisher():
+    global _publisher
+    if _publisher:
+        await _publisher.stop()
+        _publisher = None

@@ -1,6 +1,6 @@
 """
 {{ service_name }} - FastAPI Application
-12-factor app compliant with LangChain and LangFuse support
+12-factor app compliant
 """
 from contextlib import asynccontextmanager
 import logging
@@ -12,7 +12,7 @@ from src.health import HealthChecker
 from src.api.health import router as health_router
 
 {% if features.langfuse %}
-from src.langchain.langfuse_config import setup_langfuse
+from src.connections.langfuse_config import setup_langfuse, flush_langfuse
 {% endif %}
 
 logging.basicConfig(
@@ -29,28 +29,20 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
     
     {% if features.langfuse %}
-    # Initialize LangFuse
-    setup_langfuse()
-    logger.info("LangFuse initialized")
+    setup_langfuse(settings)
     {% endif %}
     
-    # Initialize health checker
     health_checker = HealthChecker()
     await health_checker.initialize()
     app.state.health_checker = health_checker
     
     yield
     
-    # Shutdown
     logger.info("Shutting down...")
     await health_checker.cleanup()
     
     {% if features.langfuse %}
-    # Flush LangFuse
-    from langfuse import Langfuse
-    langfuse = Langfuse()
-    langfuse.flush()
-    logger.info("LangFuse flushed")
+    flush_langfuse()
     {% endif %}
 
 def create_app() -> FastAPI:

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     # Application
     app_name: str = "{{ service_name }}"
     app_version: str = "0.1.0"
-    app_description: str = "FastAPI Microservice with LangChain"
+    app_description: str = "FastAPI Microservice"
     debug: bool = False
     
     # Server
@@ -36,7 +36,8 @@ class Settings(BaseSettings):
     # RabbitMQ
     rabbitmq_enabled: bool = True
     rabbitmq_url: str = "amqp://guest:guest@localhost:5672/{{ rabbitmq_vhost }}"
-    rabbitmq_queue_prefix: str = "{{ service_name }}"
+    rabbitmq_queue_in: str = "{{ rabbitmq_queue_in }}"
+    rabbitmq_queue_out: str = "{{ rabbitmq_queue_out }}"
     {% endif %}
     
     {% if features.langfuse %}

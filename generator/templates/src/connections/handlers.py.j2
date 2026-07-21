@@ -1,0 +1,49 @@
+import logging
+from typing import Any, Awaitable, Callable, Optional
+
+from aio_pika.abc import AbstractIncomingMessage
+from src.connections.schemas import InputMessage
+
+logger = logging.getLogger(__name__)
+
+
+class MessageHandler:
+
+    def __init__(
+        self,
+        process_message: Callable[[InputMessage], Awaitable[Any]],
+        dead_letter_queue: Optional[str] = None,
+    ):
+        self.process_message = process_message
+        self.dead_letter_queue = dead_letter_queue
+
+    async def handle(
+        self,
+        message: AbstractIncomingMessage,
+    ) -> None:
+        async with message.process():
+            try:
+                header = message.headers.get("target")
+                if header != "required_processing":
+                    return None
+                
+                body = message.body.decode("utf-8")
+                logger.debug(f"Received message: {body[:200]}...")
+
+                try:
+                    page_message = InputMessage.model_validate_json(body)
+                except Exception as e:
+                    logger.warning(f"Message validation failed: {e}")
+                    await message.nack(requeue=False)
+                    return
+
+                await self.process_message(page_message)
+
+                logger.info(
+                    f"Processed page: {page_message.title} "
+                    f"(id={page_message.page_id})"
+                )
+
+            except Exception as e:
+                logger.error(f"Failed to process message: {e}", exc_info=True)
+                await message.nack(requeue=True)
